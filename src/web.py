@@ -5,6 +5,7 @@ from pathlib import Path
 
 import cv2
 from flask import Flask, Response, render_template_string, request, redirect, url_for
+from werkzeug.utils import secure_filename
 
 from src.config import AppConfig, load_config
 from src.tracking import BallTracker
@@ -46,6 +47,10 @@ INDEX_HTML = """
         <input type="text" name="index" placeholder="Camera index (0)">
         <button type="submit">Use camera</button>
       </form>
+      <form method="post" action="/upload" enctype="multipart/form-data">
+        <input type="file" name="video" accept="video/*">
+        <button type="submit">Upload video</button>
+      </form>
     </div>
   </body>
 </html>
@@ -57,8 +62,11 @@ def create_app(
     camera_index: int,
     config: AppConfig,
     frames_dir: str | None = None,
+    upload_dir: str | None = None,
 ) -> Flask:
     app = Flask(__name__)
+    upload_path = Path(upload_dir or "uploads")
+    upload_path.mkdir(parents=True, exist_ok=True)
 
     state = _StreamState(video_path, camera_index, frames_dir)
     state.start()
@@ -119,6 +127,21 @@ def create_app(
             state.set_source(camera_index=cam_idx, use_frames=False)
         else:
             state.set_source(use_frames=True)
+        return redirect(url_for("index"))
+
+    @app.post("/upload")
+    def upload() -> Response:
+        if "video" not in request.files:
+            return redirect(url_for("index"))
+        file = request.files["video"]
+        if not file or not file.filename:
+            return redirect(url_for("index"))
+        filename = secure_filename(file.filename)
+        if not filename:
+            return redirect(url_for("index"))
+        target = upload_path / filename
+        file.save(str(target))
+        state.set_source(video_path=str(target), use_frames=False)
         return redirect(url_for("index"))
 
     return app
