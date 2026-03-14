@@ -21,6 +21,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--web", action="store_true", help="Serve frames in a browser via Flask")
     parser.add_argument("--host", type=str, default="127.0.0.1", help="Web host (default: 127.0.0.1)")
     parser.add_argument("--port", type=int, default=8000, help="Web port (default: 8000)")
+    parser.add_argument("--frames", type=str, default="", help="Path to a folder of JPG frames")
     parser.add_argument("--calibrate", action="store_true", help="Calibrate table ROI/quad")
     return parser.parse_args()
 
@@ -40,6 +41,7 @@ def main() -> None:
             config=config,
             host=args.host,
             port=args.port,
+            frames_dir=args.frames or None,
         )
         return
 
