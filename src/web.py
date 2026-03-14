@@ -28,6 +28,11 @@ INDEX_HTML = """
       input { padding: 6px 10px; background: #222; color: #eee; border: 1px solid #444; border-radius: 6px; }
       button { padding: 6px 12px; background: #2b6; color: #071; border: none; border-radius: 6px; cursor: pointer; }
       button.secondary { background: #444; color: #eee; }
+      .uploads { width: min(920px, 96vw); border: 1px solid #333; border-radius: 8px; padding: 10px; background: #151515; }
+      .uploads h3 { margin: 0 0 8px 0; font-size: 16px; color: #ddd; }
+      .uploads ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+      .uploads li { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+      .uploads .name { color: #bbb; }
     </style>
   </head>
   <body>
@@ -51,6 +56,10 @@ INDEX_HTML = """
         <input type="file" name="video" accept="video/*">
         <button type="submit">Upload video</button>
       </form>
+      <div class="uploads">
+        <h3>Uploaded videos</h3>
+        {{uploads}}
+      </div>
     </div>
   </body>
 </html>
@@ -95,13 +104,12 @@ def create_app(
     @app.get("/")
     def index() -> str:
         if not state.capture_ok:
-            return render_template_string(
-                INDEX_HTML.replace(
-                    "<img src=\"/video\" alt=\"stream\">",
-                    "<div class=\"msg\">No video source. Set VIDEO_PATH, CAMERA_INDEX, or SAMPLE_FRAMES_DIR.</div>",
-                )
+            html = INDEX_HTML.replace(
+                "<img src=\"/video\" alt=\"stream\">",
+                "<div class=\"msg\">No video source. Set VIDEO_PATH, CAMERA_INDEX, or SAMPLE_FRAMES_DIR.</div>",
             )
-        return render_template_string(INDEX_HTML)
+            return render_template_string(html, uploads=_render_uploads(upload_path))
+        return render_template_string(INDEX_HTML, uploads=_render_uploads(upload_path))
 
     @app.get("/video")
     def video() -> Response:
@@ -144,6 +152,26 @@ def create_app(
         state.set_source(video_path=str(target), use_frames=False)
         return redirect(url_for("index"))
 
+    @app.post("/use-upload")
+    def use_upload() -> Response:
+        name = request.form.get("name", "")
+        if not name:
+            return redirect(url_for("index"))
+        target = upload_path / name
+        if target.exists():
+            state.set_source(video_path=str(target), use_frames=False)
+        return redirect(url_for("index"))
+
+    @app.post("/delete-upload")
+    def delete_upload() -> Response:
+        name = request.form.get("name", "")
+        if not name:
+            return redirect(url_for("index"))
+        target = upload_path / name
+        if target.exists():
+            target.unlink()
+        return redirect(url_for("index"))
+
     return app
 
 
@@ -181,6 +209,33 @@ def _load_frames(frames_dir: str | None) -> list:
         if img is not None:
             images.append(img)
     return images
+
+
+def _render_uploads(upload_path: Path) -> str:
+    files = sorted(
+        [p.name for p in upload_path.iterdir() if p.is_file()],
+        key=str.lower,
+    )
+    if not files:
+        return "<div class=\"msg\">No uploads yet.</div>"
+    items = []
+    for name in files:
+        items.append(
+            "<li>"
+            f"<span class=\"name\">{name}</span>"
+            "<div>"
+            f"<form method=\"post\" action=\"/use-upload\" style=\"display:inline-flex\">"
+            f"<input type=\"hidden\" name=\"name\" value=\"{name}\">"
+            "<button type=\"submit\">Use</button>"
+            "</form>"
+            f"<form method=\"post\" action=\"/delete-upload\" style=\"display:inline-flex;margin-left:6px\">"
+            f"<input type=\"hidden\" name=\"name\" value=\"{name}\">"
+            "<button type=\"submit\" class=\"secondary\">Delete</button>"
+            "</form>"
+            "</div>"
+            "</li>"
+        )
+    return "<ul>" + "".join(items) + "</ul>"
 
 
 class _StreamState:
