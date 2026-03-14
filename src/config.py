@@ -36,6 +36,6 @@ class AppConfig:
     bounce_vy_min: float = 120.0
     bounce_cooldown_frames: int = 6
 
-    # Table region of interest in normalized coords (x0, y0, x1, y1)
-    # Update these to the table bounds for accurate in/out.
-    table_roi_norm: tuple[float, float, float, float] = (0.0, 0.0, 1.0, 1.0)
+    # Table region of interest in normalized coords (x0, y0, x1, y1).
+    # Default is a central crop; update these to the exact table bounds for accuracy.
+    table_roi_norm: tuple[float, float, float, float] = (0.08, 0.22, 0.92, 0.88)
