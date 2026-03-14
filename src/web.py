@@ -5,7 +5,7 @@ from typing import Generator, Optional
 import cv2
 from flask import Flask, Response, render_template_string
 
-from src.config import AppConfig
+from src.config import AppConfig, load_config
 from src.tracking import BallTracker
 from src.video import open_video_source
 from src.visuals import draw_overlay, ensure_bgr
@@ -77,3 +77,13 @@ def run_web_stream(
         )
 
     app.run(host=host, port=port, threaded=True)
+
+
+def run_web_stream_with_config(
+    video_path: str,
+    camera_index: int,
+    host: str,
+    port: int,
+) -> None:
+    config = load_config()
+    run_web_stream(video_path, camera_index, config, host, port)

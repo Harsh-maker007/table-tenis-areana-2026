@@ -63,7 +63,8 @@ class BallTracker:
             self.trajectory.append(best.center)
             bounced = self._detect_bounce()
             table_roi = self._table_roi(frame.shape)
-            in_table = self._in_table(best.center, table_roi)
+            table_quad = self._table_quad(frame.shape)
+            in_table = self._in_table(best.center, table_roi, table_quad)
             self.last_center = best.center
             confidence = min(1.0, best.area / max(self.config.min_area, 1))
             return TrackResult(
@@ -78,6 +79,7 @@ class BallTracker:
                 bounced=bounced,
                 in_table=in_table,
                 table_roi=table_roi,
+                table_quad=table_quad,
             )
 
         self.last_center = None
@@ -86,6 +88,7 @@ class BallTracker:
         if self._bounce_cooldown > 0:
             self._bounce_cooldown -= 1
         table_roi = self._table_roi(frame.shape)
+        table_quad = self._table_quad(frame.shape)
         return TrackResult(
             center=None,
             radius=None,
@@ -98,6 +101,7 @@ class BallTracker:
             bounced=False,
             in_table=None,
             table_roi=table_roi,
+            table_quad=table_quad,
         )
 
     def _segment_ball(self, frame: np.ndarray) -> np.ndarray:
@@ -200,7 +204,23 @@ class BallTracker:
         y1 = int(y1n * h)
         return x0, y0, x1, y1
 
+    def _table_quad(self, shape: tuple[int, int, int]) -> Optional[list[tuple[int, int]]]:
+        if not self.config.table_quad_norm:
+            return None
+        h, w = shape[:2]
+        quad = []
+        for x_n, y_n in self.config.table_quad_norm:
+            quad.append((int(x_n * w), int(y_n * h)))
+        return quad
+
     @staticmethod
-    def _in_table(center: tuple[int, int], roi: tuple[int, int, int, int]) -> bool:
+    def _in_table(
+        center: tuple[int, int],
+        roi: tuple[int, int, int, int],
+        quad: Optional[list[tuple[int, int]]],
+    ) -> bool:
+        if quad:
+            contour = np.array(quad, dtype=np.int32)
+            return cv2.pointPolygonTest(contour, center, False) >= 0
         x0, y0, x1, y1 = roi
         return x0 <= center[0] <= x1 and y0 <= center[1] <= y1

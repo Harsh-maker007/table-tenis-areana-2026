@@ -18,6 +18,7 @@ class TrackResult:
     bounced: bool
     in_table: Optional[bool]
     table_roi: tuple[int, int, int, int]
+    table_quad: Optional[list[tuple[int, int]]]
 
 
 def ensure_bgr(frame: np.ndarray) -> np.ndarray:
@@ -28,6 +29,7 @@ def ensure_bgr(frame: np.ndarray) -> np.ndarray:
 
 def draw_overlay(frame: np.ndarray, result: TrackResult) -> None:
     _draw_table_roi(frame, result.table_roi)
+    _draw_table_quad(frame, result.table_quad)
     _draw_trajectory(frame, result.trajectory)
     if result.bbox is not None:
         x0, y0, x1, y1 = result.bbox
@@ -106,3 +108,10 @@ def _draw_trajectory(frame: np.ndarray, points: list[tuple[int, int]]) -> None:
 def _draw_table_roi(frame: np.ndarray, roi: tuple[int, int, int, int]) -> None:
     x0, y0, x1, y1 = roi
     cv2.rectangle(frame, (x0, y0), (x1, y1), (80, 80, 80), 1)
+
+
+def _draw_table_quad(frame: np.ndarray, quad: Optional[list[tuple[int, int]]]) -> None:
+    if not quad:
+        return
+    pts = np.array(quad, dtype=np.int32).reshape((-1, 1, 2))
+    cv2.polylines(frame, [pts], True, (0, 255, 255), 2)

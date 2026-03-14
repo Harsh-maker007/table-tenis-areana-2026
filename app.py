@@ -2,8 +2,10 @@ import argparse
 from pathlib import Path
 
 import cv2
+import numpy as np
 
-from src.config import AppConfig
+from src.config import load_config, save_config, AppConfig
+from src.calibration import auto_detect_table, manual_select
 from src.tracking import BallTracker
 from src.video import open_video_source
 from src.visuals import draw_overlay, ensure_bgr
@@ -19,12 +21,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--web", action="store_true", help="Serve frames in a browser via Flask")
     parser.add_argument("--host", type=str, default="127.0.0.1", help="Web host (default: 127.0.0.1)")
     parser.add_argument("--port", type=int, default=8000, help="Web port (default: 8000)")
+    parser.add_argument("--calibrate", action="store_true", help="Calibrate table ROI/quad")
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    config = AppConfig()
+    config = load_config()
+
+    if args.calibrate:
+        _run_calibration(args.video, args.camera, config)
+        return
 
     if args.web:
         run_web_stream(
@@ -79,3 +86,50 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+def _run_calibration(video_path: str, camera_index: int, config: AppConfig) -> None:
+    cap = open_video_source(video_path, camera_index)
+    if not cap.isOpened():
+        raise RuntimeError("Unable to open video source")
+
+    ok, frame = cap.read()
+    cap.release()
+    if not ok or frame is None:
+        raise RuntimeError("Unable to read a frame for calibration")
+
+    frame = ensure_bgr(frame)
+    quad = auto_detect_table(frame)
+    while True:
+        canvas = frame.copy()
+        if quad:
+            pts = np.array(quad, dtype=np.int32).reshape((-1, 1, 2))
+            cv2.polylines(canvas, [pts], True, (0, 255, 255), 2)
+        cv2.putText(
+            canvas,
+            "a=auto  m=manual  s=save  q=quit",
+            (12, 22),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.6,
+            (240, 240, 240),
+            2,
+            cv2.LINE_AA,
+        )
+        cv2.imshow("calibration", canvas)
+        key = cv2.waitKey(20) & 0xFF
+        if key == ord("a"):
+            quad = auto_detect_table(frame)
+        elif key == ord("m"):
+            quad = manual_select(frame)
+        elif key == ord("s") and quad and len(quad) == 4:
+            h, w = frame.shape[:2]
+            config.table_quad_norm = [(x / w, y / h) for x, y in quad]
+            x_vals = [p[0] for p in config.table_quad_norm]
+            y_vals = [p[1] for p in config.table_quad_norm]
+            config.table_roi_norm = (min(x_vals), min(y_vals), max(x_vals), max(y_vals))
+            save_config(config)
+            break
+        elif key == ord("q"):
+            break
+
+    cv2.destroyWindow("calibration")
