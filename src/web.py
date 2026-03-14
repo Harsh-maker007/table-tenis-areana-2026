@@ -5,6 +5,7 @@ from pathlib import Path
 
 import cv2
 from flask import Flask, Response, render_template_string, request, redirect, url_for
+from markupsafe import Markup
 from werkzeug.utils import secure_filename
 
 from src.config import AppConfig, load_config
@@ -108,8 +109,8 @@ def create_app(
                 "<img src=\"/video\" alt=\"stream\">",
                 "<div class=\"msg\">No video source. Set VIDEO_PATH, CAMERA_INDEX, or SAMPLE_FRAMES_DIR.</div>",
             )
-            return render_template_string(html, uploads=_render_uploads(upload_path))
-        return render_template_string(INDEX_HTML, uploads=_render_uploads(upload_path))
+            return render_template_string(html, uploads=Markup(_render_uploads(upload_path)))
+        return render_template_string(INDEX_HTML, uploads=Markup(_render_uploads(upload_path)))
 
     @app.get("/video")
     def video() -> Response:
