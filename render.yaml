@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: table-tenis-areana-2026
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn wsgi:app --bind 0.0.0.0:$PORT
+    envVars:
+      - key: SAMPLE_FRAMES_DIR
+        value: data/sample_frames
+      - key: UPLOAD_DIR
+        value: uploads
